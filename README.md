@@ -60,12 +60,12 @@ Het paneel toont de gemeten verhouding, de vereiste verhouding, de tekstkleur, d
 
 ## Branches
 
-| Branch | Bestand                                        | Doel                            |
-| ------ | ---------------------------------------------- | ------------------------------- |
-| `main` | `Ravn-InDesign-WCAG_Contrast_checker.jsx`      | Stabiele versie                 |
-| `dev`  | `Ravn-InDesign-WCAG_Contrast_checker_DEV.jsx`  | Ontwikkelversie met nieuwe functies |
+| Branch | Bestand                                   | Doel                                |
+| ------ | ----------------------------------------- | ----------------------------------- |
+| `main` | `Ravn-InDesign-WCAG_Contrast_checker.jsx` | Stabiele versie                     |
+| `dev`  | `Ravn-InDesign-WCAG_Contrast_checker.jsx` | Ontwikkelversie met nieuwe functies |
 
-De DEV-versie voegt een tweede tab toe, **Document**, met drie controles op documentniveau:
+Het bestand heet op beide branches hetzelfde. De versie op `dev` voegt een tweede tab toe, **Document**, met drie controles op documentniveau:
 
 - of het document is opgeslagen en dus een naam heeft;
 - of alle tekst een ingestelde taal heeft;
