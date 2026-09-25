@@ -6,11 +6,14 @@
 
 #targetengine "wcagPaneel"
 
-if ($.global.wcagPaneelActief) {
+var bestaandPaneel = $.global.wcagPaneelWindow;
+var paneelStaatOpen = false;
+try { paneelStaatOpen = !!(bestaandPaneel && bestaandPaneel.visible); } catch (eBestaand) { }
+if (paneelStaatOpen) {
+    try { bestaandPaneel.show(); } catch (eToon) { }
     alert("Het WCAG-contrastpaneel staat al open.");
     exit();
 }
-$.global.wcagPaneelActief = true;
 
 var AA_NORMAAL = 4.5;
 var AA_GROOT = 3.0;
@@ -19,6 +22,30 @@ var AAA_GROOT = 4.5;
 var GROTE_TEKST_PT = 18;
 var GROTE_TEKST_PT_VET = 14;
 var AANGENOMEN_PAGINAKLEUR = [255, 255, 255];
+var KLEUR_GROEN = [0.2, 0.7, 0.2];
+var KLEUR_ROOD = [0.85, 0.2, 0.2];
+
+function maakBolletje(parent) {
+    var bol = parent.add("group");
+    bol.preferredSize = [14, 14];
+    bol.minimumSize = [14, 14];
+    bol.maximumSize = [14, 14];
+    bol.kleur = null;
+    bol.onDraw = function () {
+        if (!this.kleur) return;
+        var g = this.graphics;
+        var kwast = g.newBrush(g.BrushType.SOLID_COLOR, this.kleur, 1);
+        g.ellipsePath(2, 2, 10, 10);
+        g.fillPath(kwast);
+    };
+    return {
+        zet: function (kleur) {
+            bol.kleur = kleur;
+            bol.hide();
+            bol.show();
+        }
+    };
+}
 
 var paneelOpen = true;
 var selectieListener = null;
@@ -31,7 +58,24 @@ w.alignChildren = "fill";
 w.margins = 14;
 w.spacing = 8;
 
-var bovenRij = w.add("group");
+var tabs = w.add("tabbedpanel");
+tabs.alignChildren = "fill";
+
+var tabContrast = tabs.add("tab", undefined, "Contrast");
+tabContrast.orientation = "column";
+tabContrast.alignChildren = "fill";
+tabContrast.margins = 10;
+tabContrast.spacing = 8;
+
+var tabDocument = tabs.add("tab", undefined, "Document");
+tabDocument.orientation = "column";
+tabDocument.alignChildren = "fill";
+tabDocument.margins = 10;
+tabDocument.spacing = 8;
+
+tabs.selection = tabContrast;
+
+var bovenRij = tabContrast.add("group");
 bovenRij.alignChildren = "left";
 var autoVinkje = bovenRij.add("checkbox", undefined, "On/Off");
 autoVinkje.value = true;
@@ -40,7 +84,7 @@ var helpKnop = bovenRij.add("button", undefined, "?");
 helpKnop.preferredSize = [24, 24];
 helpKnop.alignment = "right";
 
-var instellingenRij = w.add("group");
+var instellingenRij = tabContrast.add("group");
 instellingenRij.alignChildren = "left";
 var niveauAA = instellingenRij.add("radiobutton", undefined, "AA");
 niveauAA.value = true;
@@ -50,51 +94,63 @@ niveauAA.onClick = function () { voerControleUit(); };
 niveauAAA.onClick = function () { voerControleUit(); };
 verloopVinkje.onClick = function () { voerControleUit(); };
 
-var contrastRij = w.add("group");
+var contrastRij = tabContrast.add("group");
 contrastRij.add("statictext", undefined, "Contrast:").preferredSize.width = 90;
-var statusBolletje = contrastRij.add("group");
-statusBolletje.preferredSize = [14, 14];
-statusBolletje.minimumSize = [14, 14];
-statusBolletje.maximumSize = [14, 14];
-statusBolletje.kleur = null;
-statusBolletje.onDraw = function () {
-    if (!this.kleur) return;
-    var g = this.graphics;
-    var kwast = g.newBrush(g.BrushType.SOLID_COLOR, this.kleur, 1);
-    g.ellipsePath(2, 2, 10, 10);
-    g.fillPath(kwast);
-};
-function zetStatusBolletje(kleur) {
-    statusBolletje.kleur = kleur;
-    statusBolletje.hide();
-    statusBolletje.show();
-}
+var contrastBolletje = maakBolletje(contrastRij);
 var contrastWaarde = contrastRij.add("statictext", undefined, "-");
 contrastWaarde.preferredSize.width = 300;
 contrastWaarde.graphics.font = ScriptUI.newFont(contrastWaarde.graphics.font.name, ScriptUI.FontStyle.BOLD, 13);
+var standaardContrastPen = contrastWaarde.graphics.foregroundColor;
 
-var tekstRij = w.add("group");
+var tekstRij = tabContrast.add("group");
 tekstRij.add("statictext", undefined, "Tekst:").preferredSize.width = 90;
 var tekstWaarde = tekstRij.add("statictext", undefined, "-");
 tekstWaarde.preferredSize.width = 200;
 
-var achtergrondRij = w.add("group");
+var achtergrondRij = tabContrast.add("group");
 achtergrondRij.add("statictext", undefined, "Frame Fill:").preferredSize.width = 90;
 var achtergrondWaarde = achtergrondRij.add("statictext", undefined, "-");
 achtergrondWaarde.preferredSize.width = 200;
 
-var frameStrokeRij = w.add("group");
+var frameStrokeRij = tabContrast.add("group");
 frameStrokeRij.add("statictext", undefined, "Frame Stroke:").preferredSize.width = 90;
 var frameStrokeWaarde = frameStrokeRij.add("statictext", undefined, "-");
 frameStrokeWaarde.preferredSize.width = 200;
 
-var bronText = w.add("statictext", undefined, "", { multiline: true });
+var bronText = tabContrast.add("statictext", undefined, "", { multiline: true });
 bronText.preferredSize.width = 420;
 bronText.preferredSize.height = 48;
 
-var knopRij = w.add("group");
+var knopRij = tabContrast.add("group");
 knopRij.alignment = "right";
 var verversKnop = knopRij.add("button", undefined, "Check nu");
+
+// ---------------------- TAB: DOCUMENT ----------------------
+var docNaamRij = tabDocument.add("group");
+docNaamRij.add("statictext", undefined, "Documentnaam:").preferredSize.width = 130;
+var docNaamBolletje = maakBolletje(docNaamRij);
+var docNaamTekst = docNaamRij.add("statictext", undefined, "-", { multiline: true });
+docNaamTekst.preferredSize.width = 260;
+
+var docTaalRij = tabDocument.add("group");
+docTaalRij.add("statictext", undefined, "Taal:").preferredSize.width = 130;
+var docTaalBolletje = maakBolletje(docTaalRij);
+var docTaalTekst = docTaalRij.add("statictext", undefined, "-", { multiline: true });
+docTaalTekst.preferredSize.width = 260;
+
+var docStijlenRij = tabDocument.add("group");
+docStijlenRij.add("statictext", undefined, "PDF-tags stijlen:").preferredSize.width = 130;
+var docStijlenBolletje = maakBolletje(docStijlenRij);
+var docStijlenTekst = docStijlenRij.add("statictext", undefined, "-", { multiline: true });
+docStijlenTekst.preferredSize.width = 260;
+
+var docDetailText = tabDocument.add("edittext", undefined, "", { multiline: true, scrollable: true, readonly: true });
+docDetailText.preferredSize.width = 420;
+docDetailText.preferredSize.height = 180;
+
+var docKnopRij = tabDocument.add("group");
+docKnopRij.alignment = "right";
+var docCheckKnop = docKnopRij.add("button", undefined, "Check document");
 
 w.preferredSize.width = 460;
 
@@ -137,8 +193,8 @@ function zetVelden(contrast, tekst, achtergrond, frameStroke, bron, kleur) {
         contrastWaarde.text = contrast;
         contrastWaarde.graphics.foregroundColor = kleur
             ? contrastWaarde.graphics.newPen(contrastWaarde.graphics.PenType.SOLID_COLOR, kleur, 1)
-            : contrastWaarde.graphics.foregroundColor;
-        zetStatusBolletje(kleur);
+            : standaardContrastPen;
+        contrastBolletje.zet(kleur);
         tekstWaarde.text = tekst;
         achtergrondWaarde.text = achtergrond;
         frameStrokeWaarde.text = frameStroke;
@@ -212,7 +268,7 @@ function voerControleUit() {
             }
 
             achtergrond = frame
-                ? getAchtergrondKleur(frame, page)
+                ? getAchtergrondKleur(frame)
                 : { color: null, source: "pagina-achtergrond (aanname, kader niet gevonden)", item: null };
         } else {
             zetVelden("-", "-", "-", "-", "Selecteer 1 tekstkader/tekst, of 2 objecten samen.", null);
@@ -221,7 +277,13 @@ function voerControleUit() {
 
         var bevatVerloop = verloopVinkje.value && isGradient(achtergrond.color);
         var bgRgb = bevatVerloop ? null : kleurNaarRgb(achtergrond.color);
-        if (bgRgb === null) bgRgb = AANGENOMEN_PAGINAKLEUR;
+        if (bgRgb === null) {
+            bgRgb = AANGENOMEN_PAGINAKLEUR;
+        } else if (achtergrond.item) {
+            bgRgb = mengKleuren(bgRgb, AANGENOMEN_PAGINAKLEUR, leesTint(achtergrond.item) / 100);
+            bgRgb = mengKleuren(bgRgb, AANGENOMEN_PAGINAKLEUR, leesOpacity(achtergrond.item, "fillTransparencySettings") / 100 * leesOpacity(achtergrond.item, "transparencySettings") / 100);
+        }
+        var tekstOpacity = frame ? leesOpacity(frame, "contentTransparencySettings") / 100 * leesOpacity(frame, "transparencySettings") / 100 : 1;
         var strokeWeergave = strokeKleurWeergave(achtergrond.item);
 
         var ranges;
@@ -247,6 +309,8 @@ function voerControleUit() {
             }
             var fgRgb = kleurNaarRgb(range.fillColor);
             if (fgRgb === null) continue;
+            fgRgb = mengKleuren(fgRgb, AANGENOMEN_PAGINAKLEUR, leesTint(range) / 100);
+            fgRgb = mengKleuren(fgRgb, bgRgb, tekstOpacity);
             aantal++;
 
             var isGroot = (range.pointSize >= GROTE_TEKST_PT) ||
@@ -274,7 +338,7 @@ function voerControleUit() {
         }
 
         var status = alleGoed ? "GOED  " : "FOUT  ";
-        var kleurGroenRood = alleGoed ? [0.2, 0.7, 0.2] : [0.85, 0.2, 0.2];
+        var kleurGroenRood = alleGoed ? KLEUR_GROEN : KLEUR_ROOD;
         var goedFoutLabel = status + laagsteRatio.toFixed(2) + ":1  (vereist " + laagsteVereist + ":1)";
         var bronRegel =
             "\"" + voorbeeldTekst + "\"  -  " + achtergrond.source +
@@ -291,13 +355,126 @@ function voerControleUit() {
 
 verversKnop.onClick = function () { voerControleUit(); };
 
+// ---------------------- DOCUMENTCONTROLE (TAB 2) ----------------------
+function voerDocumentControleUit() {
+    if (!paneelOpen) return;
+    try {
+        if (app.documents.length === 0) {
+            docNaamBolletje.zet(null);
+            docNaamTekst.text = "-";
+            docTaalBolletje.zet(null);
+            docTaalTekst.text = "-";
+            docStijlenBolletje.zet(null);
+            docStijlenTekst.text = "-";
+            docDetailText.text = "Geen document open.";
+            w.layout.layout(true);
+            return;
+        }
+        var doc = app.activeDocument;
+        var details = [];
+
+        try {
+            if (doc.saved) {
+                docNaamBolletje.zet(KLEUR_GROEN);
+                docNaamTekst.text = doc.name;
+            } else {
+                docNaamBolletje.zet(KLEUR_ROOD);
+                docNaamTekst.text = doc.name + " (nog niet opgeslagen)";
+            }
+        } catch (eNaam) {
+            docNaamBolletje.zet(KLEUR_ROOD);
+            docNaamTekst.text = "Kon niet uitlezen";
+            details.push("Documentnaam: " + String(eNaam));
+        }
+
+        try {
+            var talenGevonden = {};
+            var talenLijst = [];
+            var geenTaalGevonden = false;
+            for (var s = 0; s < doc.stories.length; s++) {
+                var story = doc.stories[s];
+                if (!story.contents || story.contents === "") continue;
+                var storyRanges = story.textStyleRanges;
+                for (var r = 0; r < storyRanges.length; r++) {
+                    var storyRange = storyRanges[r];
+                    if (!/\S/.test(storyRange.contents)) continue;
+                    var taalNaam = null;
+                    try { taalNaam = storyRange.appliedLanguage.name; } catch (eTaalNaam) { }
+                    if (!taalNaam || /no ?language/i.test(taalNaam)) {
+                        geenTaalGevonden = true;
+                    } else if (!talenGevonden[taalNaam]) {
+                        talenGevonden[taalNaam] = true;
+                        talenLijst.push(taalNaam);
+                    }
+                }
+            }
+            if (geenTaalGevonden) {
+                docTaalBolletje.zet(KLEUR_ROOD);
+                docTaalTekst.text = "Tekst zonder ingestelde taal gevonden";
+            } else if (talenLijst.length > 0) {
+                docTaalBolletje.zet(KLEUR_GROEN);
+                docTaalTekst.text = talenLijst.join(", ");
+            } else {
+                docTaalBolletje.zet(null);
+                docTaalTekst.text = "Geen tekst gevonden";
+            }
+        } catch (eTaal) {
+            docTaalBolletje.zet(KLEUR_ROOD);
+            docTaalTekst.text = "Kon niet controleren";
+            details.push("Taal: " + String(eTaal));
+        }
+
+        try {
+            var stijlenZonderTag = [];
+            var alleStijlen = doc.allParagraphStyles;
+            for (var p = 0; p < alleStijlen.length; p++) {
+                var stijl = alleStijlen[p];
+                if (stijl.name === "[No Paragraph Style]") continue;
+                var heeftPdfTag = false;
+                try {
+                    var maps = stijl.styleExportTagMaps;
+                    for (var m = 0; m < maps.length; m++) {
+                        if (String(maps[m].exportType).indexOf("PDF") > -1) {
+                            heeftPdfTag = true;
+                            break;
+                        }
+                    }
+                } catch (eStijl) { }
+                if (!heeftPdfTag) stijlenZonderTag.push(stijl.name);
+            }
+            if (stijlenZonderTag.length === 0) {
+                docStijlenBolletje.zet(KLEUR_GROEN);
+                docStijlenTekst.text = "Alle alineastijlen hebben een PDF-exporttag";
+            } else {
+                docStijlenBolletje.zet(KLEUR_ROOD);
+                docStijlenTekst.text = stijlenZonderTag.length + " stijl(en) zonder PDF-exporttag";
+                details.push("Zonder PDF-exporttag: " + stijlenZonderTag.join(", "));
+            }
+        } catch (eStijlen) {
+            docStijlenBolletje.zet(KLEUR_ROOD);
+            docStijlenTekst.text = "Kon niet controleren";
+            details.push("Alineastijlen: " + String(eStijlen));
+        }
+
+        docDetailText.text = details.join("\n\n");
+        w.layout.layout(true);
+    } catch (foutTotaal) {
+        try { docDetailText.text = "Fout bij documentcontrole: " + String(foutTotaal); } catch (eSchrijf) { }
+    }
+}
+
+docCheckKnop.onClick = function () { voerDocumentControleUit(); };
+
+tabs.onChange = function () {
+    if (tabs.selection === tabDocument) voerDocumentControleUit();
+};
+
 w.onClose = function () {
     paneelOpen = false;
     if (selectieListener) {
         try { selectieListener.remove(); } catch (e) { }
         selectieListener = null;
     }
-    try { $.global.wcagPaneelActief = false; } catch (e) { }
     try { $.global.wcagPaneelWindow = null; } catch (e) { }
 };
 
@@ -306,7 +483,7 @@ w.show();
 
 
 // ---------------------- ACHTERGROND BEPALEN ----------------------
-function getAchtergrondKleur(frame, page) {
+function getAchtergrondKleur(frame) {
     try {
         if (frame.fillColor && frame.fillColor.name !== "None") {
             return { color: frame.fillColor, source: "kader eigen vulling", item: frame };
@@ -314,21 +491,22 @@ function getAchtergrondKleur(frame, page) {
     } catch (e) { }
 
     try {
-        var spread = page.parent;
-        var items = spread.pageItems;
-        var frameIndex = -1;
-        for (var i = 0; i < items.length; i++) {
-            if (items[i] === frame) { frameIndex = i; break; }
-        }
-        if (frameIndex > -1) {
-            var frameBounds = frame.geometricBounds;
-            for (var j = frameIndex - 1; j >= 0; j--) {
-                var it = items[j];
-                if (it === frame) continue;
-                var bounds;
-                try { bounds = it.geometricBounds; } catch (e2) { continue; }
-                if (!bounds) continue;
-                if (boundsOverlappen(frameBounds, bounds)) {
+        var spread = vindSpread(frame);
+        if (spread) {
+            // allPageItems bevat ook objecten in groepen, gesorteerd van achter naar voor.
+            var items = spread.allPageItems;
+            var frameIndex = -1;
+            for (var i = 0; i < items.length; i++) {
+                if (zelfdeObject(items[i], frame)) { frameIndex = i; break; }
+            }
+            if (frameIndex > -1) {
+                var fb = frame.geometricBounds;
+                var midY = (fb[0] + fb[2]) / 2, midX = (fb[1] + fb[3]) / 2;
+                for (var j = frameIndex - 1; j >= 0; j--) {
+                    var it = items[j];
+                    var bounds;
+                    try { bounds = it.geometricBounds; } catch (e2) { continue; }
+                    if (!bounds || !puntInBounds(midX, midY, bounds)) continue;
                     var fc = null;
                     try { fc = it.fillColor; } catch (e3) { }
                     if (fc && fc.name !== "None") {
@@ -340,6 +518,24 @@ function getAchtergrondKleur(frame, page) {
     } catch (e) { }
 
     return { color: null, source: "pagina-achtergrond (aanname)", item: frame };
+}
+
+// Loopt omhoog tot de spread (ook voor objecten op de plakbord of in groepen).
+function vindSpread(item) {
+    var p = item;
+    for (var n = 0; n < 20; n++) {
+        try { p = p.parent; } catch (e) { return null; }
+        if (!p) return null;
+        var naam = "";
+        try { naam = p.constructor.name; } catch (e2) { }
+        if (naam === "Spread" || naam === "MasterSpread") return p;
+    }
+    return null;
+}
+
+// DOM-objecten met === vergelijken is onbetrouwbaar; vergelijk op id.
+function zelfdeObject(a, b) {
+    try { return a.id === b.id; } catch (e) { return false; }
 }
 
 // ---------------------- VERLOOP-DETECTIE ----------------------
@@ -360,10 +556,38 @@ function strokeKleurWeergave(item) {
     return rgbNaarHex(rgb);
 }
 
-function boundsOverlappen(a, b) {
-    var aY1 = a[0], aX1 = a[1], aY2 = a[2], aX2 = a[3];
-    var bY1 = b[0], bX1 = b[1], bY2 = b[2], bX2 = b[3];
-    return !(aX2 < bX1 || aX1 > bX2 || aY2 < bY1 || aY1 > bY2);
+// Ligt het punt binnen de bounds [y1, x1, y2, x2]?
+function puntInBounds(x, y, b) {
+    return x >= b[1] && x <= b[3] && y >= b[0] && y <= b[2];
+}
+
+// ---------------------- TINT EN DOORZICHTIGHEID ----------------------
+// Fill-tint in procenten (100 als er geen tint is ingesteld).
+function leesTint(obj) {
+    try {
+        var t = obj.fillTint;
+        if (typeof t === "number" && t >= 0 && t < 100) return t;
+    } catch (e) { }
+    return 100;
+}
+
+// Dekking in procenten uit een transparantie-instelling (100 als niet leesbaar).
+function leesOpacity(item, eigenschap) {
+    try {
+        var o = item[eigenschap].blendingSettings.opacity;
+        if (typeof o === "number" && o >= 0 && o < 100) return o;
+    } catch (e) { }
+    return 100;
+}
+
+// Mengt voorgrond over achtergrond; alpha 1 = alleen voorgrond.
+function mengKleuren(voor, achter, alpha) {
+    if (alpha >= 1) return voor;
+    return [
+        achter[0] + (voor[0] - achter[0]) * alpha,
+        achter[1] + (voor[1] - achter[1]) * alpha,
+        achter[2] + (voor[2] - achter[2]) * alpha
+    ];
 }
 
 // ---------------------- KLEURCONVERSIE ----------------------
@@ -385,16 +609,33 @@ function kleurNaarRgb(colorObj) {
     if (ruimte === ColorSpace.RGB) {
         return [waarde[0], waarde[1], waarde[2]];
     } else if (ruimte === ColorSpace.CMYK) {
-        var c = waarde[0] / 100, m = waarde[1] / 100, y = waarde[2] / 100, k = waarde[3] / 100;
-        return [
-            255 * (1 - c) * (1 - k),
-            255 * (1 - m) * (1 - k),
-            255 * (1 - y) * (1 - k)
-        ];
+        return cmykNaarRgb(waarde[0] / 100, waarde[1] / 100, waarde[2] / 100, waarde[3] / 100);
     } else if (ruimte === ColorSpace.LAB) {
         return labNaarRgb(waarde[0], waarde[1], waarde[2]);
     }
     return [128, 128, 128];
+}
+
+// Polynoom-benadering van een SWOP-achtige CMYK-conversie (zoals in pdf.js),
+// dichter bij wat InDesign toont dan de naieve 255*(1-c)*(1-k).
+function cmykNaarRgb(c, m, y, k) {
+    var r = 255 +
+        c * (-4.387332384609988 * c + 54.48615194189176 * m + 18.82290502165302 * y + 212.25662451639585 * k - 285.2331026137004) +
+        m * (1.7149763477362134 * m - 5.6096736904047315 * y - 17.873870861415444 * k - 5.497006427196366) +
+        y * (-2.5217340131683033 * y - 21.248923337353073 * k + 17.5119270841813) +
+        k * (-21.86122147463605 * k - 189.48180835922747);
+    var g = 255 +
+        c * (8.841041422036149 * c + 60.118027045597366 * m + 6.871425592049007 * y + 31.159100130055922 * k - 79.2970844816548) +
+        m * (-15.310361306967817 * m + 17.575251261109482 * y + 131.35250912493976 * k - 190.9453302588951) +
+        y * (4.444339102852739 * y + 9.8632861493405 * k - 24.86741582555878) +
+        k * (-20.737325471181034 * k - 187.80453709719578);
+    var b = 255 +
+        c * (0.8842522430003296 * c + 8.078677503112928 * m + 30.89978309703729 * y - 0.23883238689178934 * k - 14.183576799673286) +
+        m * (10.49593273432072 * m + 63.02378494754052 * y + 50.606957656360734 * k - 112.23884253719248) +
+        y * (0.03296041114873217 * y + 115.60384449646641 * k - 193.58209356861505) +
+        k * (-22.33816807309886 * k - 180.12613974708367);
+    function begrens(v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
+    return [begrens(r), begrens(g), begrens(b)];
 }
 
 function labNaarRgb(L, a, b) {
@@ -434,7 +675,7 @@ function rgbNaarHex(rgb) {
 function relatieveLuminantie(rgb) {
     function channel(c) {
         c = c / 255;
-        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     }
     var r = channel(rgb[0]), g = channel(rgb[1]), b = channel(rgb[2]);
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
