@@ -6,11 +6,14 @@
 
 #targetengine "wcagPaneel"
 
-if ($.global.wcagPaneelActief) {
+var bestaandPaneel = $.global.wcagPaneelWindow;
+var paneelStaatOpen = false;
+try { paneelStaatOpen = !!(bestaandPaneel && bestaandPaneel.visible); } catch (eBestaand) { }
+if (paneelStaatOpen) {
+    try { bestaandPaneel.show(); } catch (eToon) { }
     alert("Het WCAG-contrastpaneel staat al open.");
     exit();
 }
-$.global.wcagPaneelActief = true;
 
 var AA_NORMAAL = 4.5;
 var AA_GROOT = 3.0;
@@ -97,6 +100,7 @@ var contrastBolletje = maakBolletje(contrastRij);
 var contrastWaarde = contrastRij.add("statictext", undefined, "-");
 contrastWaarde.preferredSize.width = 300;
 contrastWaarde.graphics.font = ScriptUI.newFont(contrastWaarde.graphics.font.name, ScriptUI.FontStyle.BOLD, 13);
+var standaardContrastPen = contrastWaarde.graphics.foregroundColor;
 
 var tekstRij = tabContrast.add("group");
 tekstRij.add("statictext", undefined, "Tekst:").preferredSize.width = 90;
@@ -189,7 +193,7 @@ function zetVelden(contrast, tekst, achtergrond, frameStroke, bron, kleur) {
         contrastWaarde.text = contrast;
         contrastWaarde.graphics.foregroundColor = kleur
             ? contrastWaarde.graphics.newPen(contrastWaarde.graphics.PenType.SOLID_COLOR, kleur, 1)
-            : contrastWaarde.graphics.foregroundColor;
+            : standaardContrastPen;
         contrastBolletje.zet(kleur);
         tekstWaarde.text = tekst;
         achtergrondWaarde.text = achtergrond;
@@ -264,7 +268,7 @@ function voerControleUit() {
             }
 
             achtergrond = frame
-                ? getAchtergrondKleur(frame, page)
+                ? getAchtergrondKleur(frame)
                 : { color: null, source: "pagina-achtergrond (aanname, kader niet gevonden)", item: null };
         } else {
             zetVelden("-", "-", "-", "-", "Selecteer 1 tekstkader/tekst, of 2 objecten samen.", null);
@@ -273,7 +277,13 @@ function voerControleUit() {
 
         var bevatVerloop = verloopVinkje.value && isGradient(achtergrond.color);
         var bgRgb = bevatVerloop ? null : kleurNaarRgb(achtergrond.color);
-        if (bgRgb === null) bgRgb = AANGENOMEN_PAGINAKLEUR;
+        if (bgRgb === null) {
+            bgRgb = AANGENOMEN_PAGINAKLEUR;
+        } else if (achtergrond.item) {
+            bgRgb = mengKleuren(bgRgb, AANGENOMEN_PAGINAKLEUR, leesTint(achtergrond.item) / 100);
+            bgRgb = mengKleuren(bgRgb, AANGENOMEN_PAGINAKLEUR, leesOpacity(achtergrond.item, "fillTransparencySettings") / 100 * leesOpacity(achtergrond.item, "transparencySettings") / 100);
+        }
+        var tekstOpacity = frame ? leesOpacity(frame, "contentTransparencySettings") / 100 * leesOpacity(frame, "transparencySettings") / 100 : 1;
         var strokeWeergave = strokeKleurWeergave(achtergrond.item);
 
         var ranges;
@@ -299,6 +309,8 @@ function voerControleUit() {
             }
             var fgRgb = kleurNaarRgb(range.fillColor);
             if (fgRgb === null) continue;
+            fgRgb = mengKleuren(fgRgb, AANGENOMEN_PAGINAKLEUR, leesTint(range) / 100);
+            fgRgb = mengKleuren(fgRgb, bgRgb, tekstOpacity);
             aantal++;
 
             var isGroot = (range.pointSize >= GROTE_TEKST_PT) ||
@@ -382,15 +394,18 @@ function voerDocumentControleUit() {
             for (var s = 0; s < doc.stories.length; s++) {
                 var story = doc.stories[s];
                 if (!story.contents || story.contents === "") continue;
-                var taal = null;
-                try { taal = story.texts[0].appliedLanguage; } catch (eTaalLezen) { }
-                var taalNaam = null;
-                try { taalNaam = taal ? taal.name : null; } catch (eTaalNaam) { }
-                if (!taalNaam || /no ?language/i.test(taalNaam)) {
-                    geenTaalGevonden = true;
-                } else if (!talenGevonden[taalNaam]) {
-                    talenGevonden[taalNaam] = true;
-                    talenLijst.push(taalNaam);
+                var storyRanges = story.textStyleRanges;
+                for (var r = 0; r < storyRanges.length; r++) {
+                    var storyRange = storyRanges[r];
+                    if (!/\S/.test(storyRange.contents)) continue;
+                    var taalNaam = null;
+                    try { taalNaam = storyRange.appliedLanguage.name; } catch (eTaalNaam) { }
+                    if (!taalNaam || /no ?language/i.test(taalNaam)) {
+                        geenTaalGevonden = true;
+                    } else if (!talenGevonden[taalNaam]) {
+                        talenGevonden[taalNaam] = true;
+                        talenLijst.push(taalNaam);
+                    }
                 }
             }
             if (geenTaalGevonden) {
@@ -460,7 +475,6 @@ w.onClose = function () {
         try { selectieListener.remove(); } catch (e) { }
         selectieListener = null;
     }
-    try { $.global.wcagPaneelActief = false; } catch (e) { }
     try { $.global.wcagPaneelWindow = null; } catch (e) { }
 };
 
@@ -469,7 +483,7 @@ w.show();
 
 
 // ---------------------- ACHTERGROND BEPALEN ----------------------
-function getAchtergrondKleur(frame, page) {
+function getAchtergrondKleur(frame) {
     try {
         if (frame.fillColor && frame.fillColor.name !== "None") {
             return { color: frame.fillColor, source: "kader eigen vulling", item: frame };
@@ -477,21 +491,22 @@ function getAchtergrondKleur(frame, page) {
     } catch (e) { }
 
     try {
-        var spread = page.parent;
-        var items = spread.pageItems;
-        var frameIndex = -1;
-        for (var i = 0; i < items.length; i++) {
-            if (items[i] === frame) { frameIndex = i; break; }
-        }
-        if (frameIndex > -1) {
-            var frameBounds = frame.geometricBounds;
-            for (var j = frameIndex - 1; j >= 0; j--) {
-                var it = items[j];
-                if (it === frame) continue;
-                var bounds;
-                try { bounds = it.geometricBounds; } catch (e2) { continue; }
-                if (!bounds) continue;
-                if (boundsOverlappen(frameBounds, bounds)) {
+        var spread = vindSpread(frame);
+        if (spread) {
+            // allPageItems bevat ook objecten in groepen, gesorteerd van achter naar voor.
+            var items = spread.allPageItems;
+            var frameIndex = -1;
+            for (var i = 0; i < items.length; i++) {
+                if (zelfdeObject(items[i], frame)) { frameIndex = i; break; }
+            }
+            if (frameIndex > -1) {
+                var fb = frame.geometricBounds;
+                var midY = (fb[0] + fb[2]) / 2, midX = (fb[1] + fb[3]) / 2;
+                for (var j = frameIndex - 1; j >= 0; j--) {
+                    var it = items[j];
+                    var bounds;
+                    try { bounds = it.geometricBounds; } catch (e2) { continue; }
+                    if (!bounds || !puntInBounds(midX, midY, bounds)) continue;
                     var fc = null;
                     try { fc = it.fillColor; } catch (e3) { }
                     if (fc && fc.name !== "None") {
@@ -503,6 +518,24 @@ function getAchtergrondKleur(frame, page) {
     } catch (e) { }
 
     return { color: null, source: "pagina-achtergrond (aanname)", item: frame };
+}
+
+// Loopt omhoog tot de spread (ook voor objecten op de plakbord of in groepen).
+function vindSpread(item) {
+    var p = item;
+    for (var n = 0; n < 20; n++) {
+        try { p = p.parent; } catch (e) { return null; }
+        if (!p) return null;
+        var naam = "";
+        try { naam = p.constructor.name; } catch (e2) { }
+        if (naam === "Spread" || naam === "MasterSpread") return p;
+    }
+    return null;
+}
+
+// DOM-objecten met === vergelijken is onbetrouwbaar; vergelijk op id.
+function zelfdeObject(a, b) {
+    try { return a.id === b.id; } catch (e) { return false; }
 }
 
 // ---------------------- VERLOOP-DETECTIE ----------------------
@@ -523,10 +556,38 @@ function strokeKleurWeergave(item) {
     return rgbNaarHex(rgb);
 }
 
-function boundsOverlappen(a, b) {
-    var aY1 = a[0], aX1 = a[1], aY2 = a[2], aX2 = a[3];
-    var bY1 = b[0], bX1 = b[1], bY2 = b[2], bX2 = b[3];
-    return !(aX2 < bX1 || aX1 > bX2 || aY2 < bY1 || aY1 > bY2);
+// Ligt het punt binnen de bounds [y1, x1, y2, x2]?
+function puntInBounds(x, y, b) {
+    return x >= b[1] && x <= b[3] && y >= b[0] && y <= b[2];
+}
+
+// ---------------------- TINT EN DOORZICHTIGHEID ----------------------
+// Fill-tint in procenten (100 als er geen tint is ingesteld).
+function leesTint(obj) {
+    try {
+        var t = obj.fillTint;
+        if (typeof t === "number" && t >= 0 && t < 100) return t;
+    } catch (e) { }
+    return 100;
+}
+
+// Dekking in procenten uit een transparantie-instelling (100 als niet leesbaar).
+function leesOpacity(item, eigenschap) {
+    try {
+        var o = item[eigenschap].blendingSettings.opacity;
+        if (typeof o === "number" && o >= 0 && o < 100) return o;
+    } catch (e) { }
+    return 100;
+}
+
+// Mengt voorgrond over achtergrond; alpha 1 = alleen voorgrond.
+function mengKleuren(voor, achter, alpha) {
+    if (alpha >= 1) return voor;
+    return [
+        achter[0] + (voor[0] - achter[0]) * alpha,
+        achter[1] + (voor[1] - achter[1]) * alpha,
+        achter[2] + (voor[2] - achter[2]) * alpha
+    ];
 }
 
 // ---------------------- KLEURCONVERSIE ----------------------
@@ -548,16 +609,33 @@ function kleurNaarRgb(colorObj) {
     if (ruimte === ColorSpace.RGB) {
         return [waarde[0], waarde[1], waarde[2]];
     } else if (ruimte === ColorSpace.CMYK) {
-        var c = waarde[0] / 100, m = waarde[1] / 100, y = waarde[2] / 100, k = waarde[3] / 100;
-        return [
-            255 * (1 - c) * (1 - k),
-            255 * (1 - m) * (1 - k),
-            255 * (1 - y) * (1 - k)
-        ];
+        return cmykNaarRgb(waarde[0] / 100, waarde[1] / 100, waarde[2] / 100, waarde[3] / 100);
     } else if (ruimte === ColorSpace.LAB) {
         return labNaarRgb(waarde[0], waarde[1], waarde[2]);
     }
     return [128, 128, 128];
+}
+
+// Polynoom-benadering van een SWOP-achtige CMYK-conversie (zoals in pdf.js),
+// dichter bij wat InDesign toont dan de naieve 255*(1-c)*(1-k).
+function cmykNaarRgb(c, m, y, k) {
+    var r = 255 +
+        c * (-4.387332384609988 * c + 54.48615194189176 * m + 18.82290502165302 * y + 212.25662451639585 * k - 285.2331026137004) +
+        m * (1.7149763477362134 * m - 5.6096736904047315 * y - 17.873870861415444 * k - 5.497006427196366) +
+        y * (-2.5217340131683033 * y - 21.248923337353073 * k + 17.5119270841813) +
+        k * (-21.86122147463605 * k - 189.48180835922747);
+    var g = 255 +
+        c * (8.841041422036149 * c + 60.118027045597366 * m + 6.871425592049007 * y + 31.159100130055922 * k - 79.2970844816548) +
+        m * (-15.310361306967817 * m + 17.575251261109482 * y + 131.35250912493976 * k - 190.9453302588951) +
+        y * (4.444339102852739 * y + 9.8632861493405 * k - 24.86741582555878) +
+        k * (-20.737325471181034 * k - 187.80453709719578);
+    var b = 255 +
+        c * (0.8842522430003296 * c + 8.078677503112928 * m + 30.89978309703729 * y - 0.23883238689178934 * k - 14.183576799673286) +
+        m * (10.49593273432072 * m + 63.02378494754052 * y + 50.606957656360734 * k - 112.23884253719248) +
+        y * (0.03296041114873217 * y + 115.60384449646641 * k - 193.58209356861505) +
+        k * (-22.33816807309886 * k - 180.12613974708367);
+    function begrens(v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
+    return [begrens(r), begrens(g), begrens(b)];
 }
 
 function labNaarRgb(L, a, b) {
@@ -597,7 +675,7 @@ function rgbNaarHex(rgb) {
 function relatieveLuminantie(rgb) {
     function channel(c) {
         c = c / 255;
-        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     }
     var r = channel(rgb[0]), g = channel(rgb[1]), b = channel(rgb[2]);
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
