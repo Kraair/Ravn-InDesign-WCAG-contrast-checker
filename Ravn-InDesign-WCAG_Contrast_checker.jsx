@@ -19,6 +19,30 @@ var AAA_GROOT = 4.5;
 var GROTE_TEKST_PT = 18;
 var GROTE_TEKST_PT_VET = 14;
 var AANGENOMEN_PAGINAKLEUR = [255, 255, 255];
+var KLEUR_GROEN = [0.2, 0.7, 0.2];
+var KLEUR_ROOD = [0.85, 0.2, 0.2];
+
+function maakBolletje(parent) {
+    var bol = parent.add("group");
+    bol.preferredSize = [14, 14];
+    bol.minimumSize = [14, 14];
+    bol.maximumSize = [14, 14];
+    bol.kleur = null;
+    bol.onDraw = function () {
+        if (!this.kleur) return;
+        var g = this.graphics;
+        var kwast = g.newBrush(g.BrushType.SOLID_COLOR, this.kleur, 1);
+        g.ellipsePath(2, 2, 10, 10);
+        g.fillPath(kwast);
+    };
+    return {
+        zet: function (kleur) {
+            bol.kleur = kleur;
+            bol.hide();
+            bol.show();
+        }
+    };
+}
 
 var paneelOpen = true;
 var selectieListener = null;
@@ -31,7 +55,24 @@ w.alignChildren = "fill";
 w.margins = 14;
 w.spacing = 8;
 
-var bovenRij = w.add("group");
+var tabs = w.add("tabbedpanel");
+tabs.alignChildren = "fill";
+
+var tabContrast = tabs.add("tab", undefined, "Contrast");
+tabContrast.orientation = "column";
+tabContrast.alignChildren = "fill";
+tabContrast.margins = 10;
+tabContrast.spacing = 8;
+
+var tabDocument = tabs.add("tab", undefined, "Document");
+tabDocument.orientation = "column";
+tabDocument.alignChildren = "fill";
+tabDocument.margins = 10;
+tabDocument.spacing = 8;
+
+tabs.selection = tabContrast;
+
+var bovenRij = tabContrast.add("group");
 bovenRij.alignChildren = "left";
 var autoVinkje = bovenRij.add("checkbox", undefined, "On/Off");
 autoVinkje.value = true;
@@ -40,7 +81,7 @@ var helpKnop = bovenRij.add("button", undefined, "?");
 helpKnop.preferredSize = [24, 24];
 helpKnop.alignment = "right";
 
-var instellingenRij = w.add("group");
+var instellingenRij = tabContrast.add("group");
 instellingenRij.alignChildren = "left";
 var niveauAA = instellingenRij.add("radiobutton", undefined, "AA");
 niveauAA.value = true;
@@ -50,51 +91,62 @@ niveauAA.onClick = function () { voerControleUit(); };
 niveauAAA.onClick = function () { voerControleUit(); };
 verloopVinkje.onClick = function () { voerControleUit(); };
 
-var contrastRij = w.add("group");
+var contrastRij = tabContrast.add("group");
 contrastRij.add("statictext", undefined, "Contrast:").preferredSize.width = 90;
-var statusBolletje = contrastRij.add("group");
-statusBolletje.preferredSize = [14, 14];
-statusBolletje.minimumSize = [14, 14];
-statusBolletje.maximumSize = [14, 14];
-statusBolletje.kleur = null;
-statusBolletje.onDraw = function () {
-    if (!this.kleur) return;
-    var g = this.graphics;
-    var kwast = g.newBrush(g.BrushType.SOLID_COLOR, this.kleur, 1);
-    g.ellipsePath(2, 2, 10, 10);
-    g.fillPath(kwast);
-};
-function zetStatusBolletje(kleur) {
-    statusBolletje.kleur = kleur;
-    statusBolletje.hide();
-    statusBolletje.show();
-}
+var contrastBolletje = maakBolletje(contrastRij);
 var contrastWaarde = contrastRij.add("statictext", undefined, "-");
 contrastWaarde.preferredSize.width = 300;
 contrastWaarde.graphics.font = ScriptUI.newFont(contrastWaarde.graphics.font.name, ScriptUI.FontStyle.BOLD, 13);
 
-var tekstRij = w.add("group");
+var tekstRij = tabContrast.add("group");
 tekstRij.add("statictext", undefined, "Tekst:").preferredSize.width = 90;
 var tekstWaarde = tekstRij.add("statictext", undefined, "-");
 tekstWaarde.preferredSize.width = 200;
 
-var achtergrondRij = w.add("group");
+var achtergrondRij = tabContrast.add("group");
 achtergrondRij.add("statictext", undefined, "Frame Fill:").preferredSize.width = 90;
 var achtergrondWaarde = achtergrondRij.add("statictext", undefined, "-");
 achtergrondWaarde.preferredSize.width = 200;
 
-var frameStrokeRij = w.add("group");
+var frameStrokeRij = tabContrast.add("group");
 frameStrokeRij.add("statictext", undefined, "Frame Stroke:").preferredSize.width = 90;
 var frameStrokeWaarde = frameStrokeRij.add("statictext", undefined, "-");
 frameStrokeWaarde.preferredSize.width = 200;
 
-var bronText = w.add("statictext", undefined, "", { multiline: true });
+var bronText = tabContrast.add("statictext", undefined, "", { multiline: true });
 bronText.preferredSize.width = 420;
 bronText.preferredSize.height = 48;
 
-var knopRij = w.add("group");
+var knopRij = tabContrast.add("group");
 knopRij.alignment = "right";
 var verversKnop = knopRij.add("button", undefined, "Check nu");
+
+// ---------------------- TAB: DOCUMENT ----------------------
+var docNaamRij = tabDocument.add("group");
+docNaamRij.add("statictext", undefined, "Documentnaam:").preferredSize.width = 130;
+var docNaamBolletje = maakBolletje(docNaamRij);
+var docNaamTekst = docNaamRij.add("statictext", undefined, "-", { multiline: true });
+docNaamTekst.preferredSize.width = 260;
+
+var docTaalRij = tabDocument.add("group");
+docTaalRij.add("statictext", undefined, "Taal:").preferredSize.width = 130;
+var docTaalBolletje = maakBolletje(docTaalRij);
+var docTaalTekst = docTaalRij.add("statictext", undefined, "-", { multiline: true });
+docTaalTekst.preferredSize.width = 260;
+
+var docStijlenRij = tabDocument.add("group");
+docStijlenRij.add("statictext", undefined, "PDF-tags stijlen:").preferredSize.width = 130;
+var docStijlenBolletje = maakBolletje(docStijlenRij);
+var docStijlenTekst = docStijlenRij.add("statictext", undefined, "-", { multiline: true });
+docStijlenTekst.preferredSize.width = 260;
+
+var docDetailText = tabDocument.add("edittext", undefined, "", { multiline: true, scrollable: true, readonly: true });
+docDetailText.preferredSize.width = 420;
+docDetailText.preferredSize.height = 180;
+
+var docKnopRij = tabDocument.add("group");
+docKnopRij.alignment = "right";
+var docCheckKnop = docKnopRij.add("button", undefined, "Check document");
 
 w.preferredSize.width = 460;
 
@@ -138,7 +190,7 @@ function zetVelden(contrast, tekst, achtergrond, frameStroke, bron, kleur) {
         contrastWaarde.graphics.foregroundColor = kleur
             ? contrastWaarde.graphics.newPen(contrastWaarde.graphics.PenType.SOLID_COLOR, kleur, 1)
             : contrastWaarde.graphics.foregroundColor;
-        zetStatusBolletje(kleur);
+        contrastBolletje.zet(kleur);
         tekstWaarde.text = tekst;
         achtergrondWaarde.text = achtergrond;
         frameStrokeWaarde.text = frameStroke;
@@ -274,7 +326,7 @@ function voerControleUit() {
         }
 
         var status = alleGoed ? "GOED  " : "FOUT  ";
-        var kleurGroenRood = alleGoed ? [0.2, 0.7, 0.2] : [0.85, 0.2, 0.2];
+        var kleurGroenRood = alleGoed ? KLEUR_GROEN : KLEUR_ROOD;
         var goedFoutLabel = status + laagsteRatio.toFixed(2) + ":1  (vereist " + laagsteVereist + ":1)";
         var bronRegel =
             "\"" + voorbeeldTekst + "\"  -  " + achtergrond.source +
@@ -290,6 +342,117 @@ function voerControleUit() {
 
 
 verversKnop.onClick = function () { voerControleUit(); };
+
+// ---------------------- DOCUMENTCONTROLE (TAB 2) ----------------------
+function voerDocumentControleUit() {
+    if (!paneelOpen) return;
+    try {
+        if (app.documents.length === 0) {
+            docNaamBolletje.zet(null);
+            docNaamTekst.text = "-";
+            docTaalBolletje.zet(null);
+            docTaalTekst.text = "-";
+            docStijlenBolletje.zet(null);
+            docStijlenTekst.text = "-";
+            docDetailText.text = "Geen document open.";
+            w.layout.layout(true);
+            return;
+        }
+        var doc = app.activeDocument;
+        var details = [];
+
+        try {
+            if (doc.saved) {
+                docNaamBolletje.zet(KLEUR_GROEN);
+                docNaamTekst.text = doc.name;
+            } else {
+                docNaamBolletje.zet(KLEUR_ROOD);
+                docNaamTekst.text = doc.name + " (nog niet opgeslagen)";
+            }
+        } catch (eNaam) {
+            docNaamBolletje.zet(KLEUR_ROOD);
+            docNaamTekst.text = "Kon niet uitlezen";
+            details.push("Documentnaam: " + String(eNaam));
+        }
+
+        try {
+            var talenGevonden = {};
+            var talenLijst = [];
+            var geenTaalGevonden = false;
+            for (var s = 0; s < doc.stories.length; s++) {
+                var story = doc.stories[s];
+                if (!story.contents || story.contents === "") continue;
+                var taal = null;
+                try { taal = story.texts[0].appliedLanguage; } catch (eTaalLezen) { }
+                var taalNaam = null;
+                try { taalNaam = taal ? taal.name : null; } catch (eTaalNaam) { }
+                if (!taalNaam || /no ?language/i.test(taalNaam)) {
+                    geenTaalGevonden = true;
+                } else if (!talenGevonden[taalNaam]) {
+                    talenGevonden[taalNaam] = true;
+                    talenLijst.push(taalNaam);
+                }
+            }
+            if (geenTaalGevonden) {
+                docTaalBolletje.zet(KLEUR_ROOD);
+                docTaalTekst.text = "Tekst zonder ingestelde taal gevonden";
+            } else if (talenLijst.length > 0) {
+                docTaalBolletje.zet(KLEUR_GROEN);
+                docTaalTekst.text = talenLijst.join(", ");
+            } else {
+                docTaalBolletje.zet(null);
+                docTaalTekst.text = "Geen tekst gevonden";
+            }
+        } catch (eTaal) {
+            docTaalBolletje.zet(KLEUR_ROOD);
+            docTaalTekst.text = "Kon niet controleren";
+            details.push("Taal: " + String(eTaal));
+        }
+
+        try {
+            var stijlenZonderTag = [];
+            var alleStijlen = doc.allParagraphStyles;
+            for (var p = 0; p < alleStijlen.length; p++) {
+                var stijl = alleStijlen[p];
+                if (stijl.name === "[No Paragraph Style]") continue;
+                var heeftPdfTag = false;
+                try {
+                    var maps = stijl.styleExportTagMaps;
+                    for (var m = 0; m < maps.length; m++) {
+                        if (String(maps[m].exportType).indexOf("PDF") > -1) {
+                            heeftPdfTag = true;
+                            break;
+                        }
+                    }
+                } catch (eStijl) { }
+                if (!heeftPdfTag) stijlenZonderTag.push(stijl.name);
+            }
+            if (stijlenZonderTag.length === 0) {
+                docStijlenBolletje.zet(KLEUR_GROEN);
+                docStijlenTekst.text = "Alle alineastijlen hebben een PDF-exporttag";
+            } else {
+                docStijlenBolletje.zet(KLEUR_ROOD);
+                docStijlenTekst.text = stijlenZonderTag.length + " stijl(en) zonder PDF-exporttag";
+                details.push("Zonder PDF-exporttag: " + stijlenZonderTag.join(", "));
+            }
+        } catch (eStijlen) {
+            docStijlenBolletje.zet(KLEUR_ROOD);
+            docStijlenTekst.text = "Kon niet controleren";
+            details.push("Alineastijlen: " + String(eStijlen));
+        }
+
+        docDetailText.text = details.join("\n\n");
+        w.layout.layout(true);
+    } catch (foutTotaal) {
+        try { docDetailText.text = "Fout bij documentcontrole: " + String(foutTotaal); } catch (eSchrijf) { }
+    }
+}
+
+docCheckKnop.onClick = function () { voerDocumentControleUit(); };
+
+tabs.onChange = function () {
+    if (tabs.selection === tabDocument) voerDocumentControleUit();
+};
 
 w.onClose = function () {
     paneelOpen = false;
